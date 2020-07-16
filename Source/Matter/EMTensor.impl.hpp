@@ -67,12 +67,12 @@ void EMTensor<matter_t>::compute(Cell<data_t> current_cell) const
     if (m_c_Sij.size() > 0)
     {
 #if DEFAULT_TENSOR_DIM == 3
-        current_cell.store_vars(emtensor.Sij[0][0], m_c.Sij.begin());
-        current_cell.store_vars(emtensor.Sij[0][1], m_c.Sij.begin() + 1);
-        current_cell.store_vars(emtensor.Sij[0][2], m_c.Sij.begin() + 2);
-        current_cell.store_vars(emtensor.Sij[1][1], m_c.Sij.begin() + 3);
-        current_cell.store_vars(emtensor.Sij[1][2], m_c.Sij.begin() + 4);
-        current_cell.store_vars(emtensor.Sij[2][2], m_c.Sij.begin() + 5);
+        current_cell.store_vars(emtensor.Sij[0][0], m_c_Sij.begin());
+        current_cell.store_vars(emtensor.Sij[0][1], m_c_Sij.begin() + 1);
+        current_cell.store_vars(emtensor.Sij[0][2], m_c_Sij.begin() + 2);
+        current_cell.store_vars(emtensor.Sij[1][1], m_c_Sij.begin() + 3);
+        current_cell.store_vars(emtensor.Sij[1][2], m_c_Sij.begin() + 4);
+        current_cell.store_vars(emtensor.Sij[2][2], m_c_Sij.begin() + 5);
 #endif
     }
 }
