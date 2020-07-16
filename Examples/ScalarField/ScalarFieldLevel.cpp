@@ -17,17 +17,20 @@
 #include "MatterConstraints.hpp"
 
 // For tag cells
-#include "ChiAndPhiTaggingCriterion.hpp"
+#include "ChiAndPhiExtractionTaggingCriterion.hpp"
 
 // Problem specific includes
+#include "AMRReductions.hpp"
 #include "ChiRelaxation.hpp"
 #include "ComputePack.hpp"
+#include "EMTensor.hpp"
 #include "MatterEnergyFlux.hpp"
 #include "MatterEnergyFluxExtraction.hpp"
 #include "Potential.hpp"
 #include "ScalarBubble.hpp"
 #include "ScalarField.hpp"
 #include "SetValue.hpp"
+#include "SetValueVolume.hpp"
 
 // Things to do at each advance step, after the RK4 is calculated
 void ScalarFieldLevel::specificAdvance()
@@ -56,6 +59,9 @@ void ScalarFieldLevel::initialData()
     BoxLoops::loop(make_compute_pack(SetValue(0.0),
                                      ScalarBubble(m_p.initial_params, m_dx)),
                    m_state_new, m_state_new, INCLUDE_GHOST_CELLS);
+
+    BoxLoops::loop(SetValue(0.0), m_state_diagnostics, m_state_diagnostics,
+                   INCLUDE_GHOST_CELLS);
 }
 
 // Things to do before outputting a checkpoint file
@@ -125,33 +131,97 @@ void ScalarFieldLevel::specificUpdateODE(GRLevelData &a_soln,
 void ScalarFieldLevel::computeTaggingCriterion(FArrayBox &tagging_criterion,
                                                const FArrayBox &current_state)
 {
-    BoxLoops::loop(ChiAndPhiTaggingCriterion(m_dx, m_p.regrid_threshold_chi,
-                                             m_p.regrid_threshold_phi),
+    BoxLoops::loop(ChiAndPhiExtractionTaggingCriterion(
+                       m_dx, m_p.regrid_threshold_chi, m_p.regrid_threshold_phi,
+                       m_p.extraction_params, m_level, m_p.activate_extraction),
                    current_state, tagging_criterion);
 }
 
 void ScalarFieldLevel::specificPostTimeStep()
 {
+    CH_TIME("ScalarFieldLevel::specificPostTimeStep");
+    bool first_step = (m_dt == m_time);
     if (m_p.activate_extraction)
     {
+        CH_TIME("energy_flux_extraction");
         fillAllGhosts();
         Potential potential(m_p.potential_params);
         ScalarFieldWithPotential scalar_field(potential);
-        BoxLoops::loop(MatterEnergyFlux<ScalarFieldWithPotential>(
-                           scalar_field, m_p.extraction_params.center, m_dx,
-                           c_energy_flux),
-                       m_state_new, m_state_diagnostics, EXCLUDE_GHOST_CELLS);
+        BoxLoops::loop(
+            make_compute_pack(
+                EMTensor<ScalarFieldWithPotential>(scalar_field, m_dx, c_rho),
+                MatterEnergyFlux<ScalarFieldWithPotential>(
+                    scalar_field, m_p.extraction_params.center, m_dx,
+                    c_energy_flux)),
+            m_state_new, m_state_diagnostics, EXCLUDE_GHOST_CELLS);
 
-        // ignore extraction level param for now since tagging criterion does
-        // not enforce it
-        if (m_level == 0)
+        if (m_level == m_p.extraction_params.min_extraction_level())
         {
-            bool first_step = (m_dt == m_time);
             MatterEnergyFluxExtraction energy_flux_extraction(
                 m_p.extraction_params, m_dt, m_time, first_step, m_restart_time,
                 c_energy_flux);
             m_gr_amr.m_interpolator->refresh();
             energy_flux_extraction.execute_query(m_gr_amr.m_interpolator);
+        }
+
+        if (m_level == 0)
+        {
+            CH_TIME("calculate_energy");
+            // Calculate the total energy within in each extraction sphere.
+            AMRReductions<VariableType::diagnostic> amr_reductions(m_gr_amr);
+            std::vector<GRAMRLevel *> all_level_ptrs =
+                m_gr_amr.get_gramrlevels();
+            std::vector<double> total_energy(
+                m_p.extraction_params.num_extraction_radii);
+
+            // start with largest radius first as we're going to zero the
+            // grid variable outside each radius before computing the sum
+            // note this assumes the extraction_radii are in ascending order
+            // which is not enforced
+            for (int iradius = m_p.extraction_params.num_extraction_radii - 1;
+                 iradius >= 0; --iradius)
+            {
+                for (auto level_ptr : all_level_ptrs)
+                {
+                    ScalarFieldLevel *sf_level_ptr =
+                        dynamic_cast<ScalarFieldLevel *>(level_ptr);
+                    if (sf_level_ptr == nullptr)
+                    {
+                        break;
+                    }
+
+                    BoxLoops::loop(
+                        SetValueVolume<SphericalVolumeComplement>(
+                            0.0, Interval(c_rho, c_rho),
+                            SphericalVolumeComplement(
+                                m_p.extraction_params.extraction_radii[iradius],
+                                m_p.extraction_params.center,
+                                sf_level_ptr->m_dx)),
+                        sf_level_ptr->m_state_diagnostics,
+                        sf_level_ptr->m_state_diagnostics, EXCLUDE_GHOST_CELLS);
+                }
+                total_energy[iradius] = amr_reductions.sum(c_rho);
+            }
+
+            SmallDataIO energy_file("energy", m_dt, m_time, m_restart_time,
+                                    SmallDataIO::APPEND, first_step);
+            energy_file.remove_duplicate_time_data();
+            if (first_step)
+            {
+                std::vector<std::string> header_strings(
+                    m_p.extraction_params.num_extraction_radii);
+                for (int iradius = 0;
+                     iradius < m_p.extraction_params.num_extraction_radii;
+                     ++iradius)
+                {
+                    header_strings[iradius] =
+                        "r < " +
+                        std::to_string(
+                            m_p.extraction_params.extraction_radii[iradius]);
+                }
+                energy_file.write_header_line(header_strings);
+            }
+            energy_file.write_time_data_line(total_energy);
         }
     }
 }
