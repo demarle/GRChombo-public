@@ -27,7 +27,7 @@ EMTensor<matter_t>::EMTensor(const matter_t &a_matter, const double dx,
     if (m_c_Si.size() != 0)
     {
         // Si is a vector
-        CH_assert(m_c_Si.size() == DEFAULT_TENSOR_DIM)
+        CH_assert(m_c_Si.size() == DEFAULT_TENSOR_DIM);
     }
 
     if (m_c_Sij.size() != 0)
