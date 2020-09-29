@@ -173,6 +173,13 @@ void BinaryBHLevel::specificPostTimeStep()
         }
     }
 
+#ifdef USE_AHFINDER
+    if (m_p.AH_activate && m_level == m_p.AH_params.level)
+    {
+        pout() << "AHFinder::solve on level " << m_level << endl;
+        AHFinder::solve(m_bh_amr, m_dt, m_time, m_restart_time);
+    }
+#endif
     // do puncture tracking on requested level
     if (m_p.track_punctures == 1 && m_level == m_p.puncture_tracking_level)
     {

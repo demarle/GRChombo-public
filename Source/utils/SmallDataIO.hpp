@@ -110,8 +110,10 @@ class SmallDataIO
     //! Writes a data line
     //! Use this for 1D or 2D data when the first two or more columns are
     //! coordinates.
-    void write_data_line(const std::vector<double> &a_data,
-                         const std::vector<double> &a_coords = {});
+    //! No second argument prints simply the data line
+    void write_data_line(
+        const std::vector<double> &a_data,
+        const std::vector<double> &a_coords = std::vector<double>());
 
     //! This just adds a double line break to the file.
     void line_break();
@@ -121,6 +123,8 @@ class SmallDataIO
     void remove_duplicate_time_data(const bool keep_m_time_data = false);
 
     // ------------ Reading Functions ------------
+
+    static std::vector<std::vector<double>> read(std::string a_filename);
 
     //! Get the data associated to specific coordinates from the file
     //! Note only the first line with the given coordinates is obtained

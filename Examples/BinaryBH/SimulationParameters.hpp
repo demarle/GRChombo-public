@@ -30,6 +30,13 @@ class SimulationParameters : public SimulationParametersBase
         pp.load("massB", bh2_params.mass);
         pp.load("momentumB", bh2_params.momentum);
 
+#ifdef USE_AHFINDER
+        pp.load("AH_1_initial_guess", AH_1_initial_guess,
+                0.5 * bh1_params.mass);
+        pp.load("AH_2_initial_guess", AH_2_initial_guess,
+                0.5 * bh2_params.mass);
+#endif
+
         // Get the centers of the BHs either explicitly or as
         // an offset (not both, or they will be offset from center
         // provided)
@@ -67,6 +74,11 @@ class SimulationParameters : public SimulationParametersBase
     // Collection of parameters necessary for initial conditions
     BoostedBH::params_t bh2_params;
     BoostedBH::params_t bh1_params;
+
+#ifdef USE_AHFINDER
+    double AH_1_initial_guess;
+    double AH_2_initial_guess;
+#endif
 };
 
 #endif /* SIMULATIONPARAMETERS_HPP_ */

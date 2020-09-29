@@ -241,6 +241,119 @@ void SmallDataIO::remove_duplicate_time_data(const bool keep_m_time_data)
 }
 
 // ------------ Reading Functions ------------
+std::vector<std::vector<double>> SmallDataIO::read(std::string a_filename)
+{
+    int rank = 0;
+#ifdef CH_MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif /* CH_MPI */
+
+    int Nrows = 0, Ncols = 0;
+
+    std::fstream file;
+
+    if (rank == 0)
+    {
+        file.open(a_filename, std::ios::in);
+        if (!file)
+        {
+            std::cout << "File '" << a_filename << "' not found." << std::endl;
+            return {{}};
+        }
+
+        // run through file to get number of rows and cols
+        std::string line, save = "";
+        while (std::getline(file, line))
+        {
+            if (line.substr(0, 2) == "//" || line.substr(0, 1) == "#")
+                continue;
+            else if (save == "")
+                save = line;
+            ++Nrows;
+        }
+
+        // run through line and count number of columns
+        std::stringstream str(save);
+
+        std::string x_str;
+        double x;
+        str >> x_str;
+        if (x_str == "nan")
+            x = NAN;
+        else
+            (std::stringstream(x_str) >> x);
+        while (!str.fail())
+        {
+            str >> x_str;
+            if (x_str == "nan")
+                x = NAN;
+            else
+                (std::stringstream(x_str) >> x);
+            ++Ncols;
+        }
+    }
+
+#ifdef CH_MPI
+    MPI_Bcast(&Nrows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&Ncols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+#endif /* CH_MPI */
+
+    if (rank == 0)
+        std::cout << "Found " << Ncols << " columns and " << Nrows
+                  << " rows in file '" << a_filename << "'." << std::endl;
+
+    std::vector<std::vector<double>> out(Ncols, std::vector<double>(Nrows));
+
+    if (rank == 0)
+    {
+        file.clear();
+        file.seekg(0, file.beg);
+
+        int j = 0;
+        std::string line;
+        while (std::getline(file, line))
+        {
+            if (line.substr(0, 2) == "//" || line.substr(0, 1) == "#")
+                continue;
+
+            std::stringstream ss(line);
+            std::string x_str;
+            double x;
+            ss >> x_str;
+            if (x_str == "nan")
+                x = NAN;
+            else
+                (std::stringstream(x_str) >> x);
+
+            int i = 0;
+            while (!ss.fail())
+            {
+                out[i++][j] = x;
+                ss >> x_str;
+                if (x_str == "nan")
+                    x = NAN;
+                else
+                    (std::stringstream(x_str) >> x);
+            }
+            ++j;
+        }
+
+        file.close();
+    }
+
+#ifdef CH_MPI
+    for (int i = 0; i < Ncols; ++i)
+        MPI_Bcast(&out[i][0], Nrows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif /* CH_MPI */
+
+    /*    if(rank==0)
+            for(int i=0; i<out.size(); ++i)
+                for(int j=0; j<out[i].size(); ++j)
+                    std::cout << "out[" << i << "][" << j << "] = " << out[i][j]
+       << std::endl;*/
+
+    return out;
+}
 
 void SmallDataIO::get_specific_data_line(std::vector<double> &a_out_data,
                                          const std::vector<double> a_coords)
@@ -260,8 +373,8 @@ void SmallDataIO::get_specific_data_line(std::vector<double> &a_out_data,
         }
         std::string coords_string = coords_ss.str();
 
-        // now search for lines that start with coords_string and put the data
-        // in a_out_data
+        // now search for lines that start with coords_string and put the
+        // data in a_out_data
         std::string line;
         while (std::getline(m_file, line))
         {
@@ -281,8 +394,8 @@ void SmallDataIO::get_specific_data_line(std::vector<double> &a_out_data,
         }
         if (!line_found)
         {
-            MayDay::Error(
-                "SmallDataIO : Data to be read in at coord not found in file");
+            MayDay::Error("SmallDataIO : Data to be read in at coord not "
+                          "found in file");
         }
     }
     // now broadcast the vector to all ranks using Chombo broadcast function

@@ -101,10 +101,15 @@ covariantZ4 = 0 # 0: default. 1: dampk1 -> dampk1/lapse
 # NB must be less than 0.5 for stability
 sigma = 0.3
 
-#extraction params
-activate_extraction = 0
-num_extraction_radii = 3
-extraction_radii = 30. 40. 50.
-extraction_levels = 2 1 0
-num_points_phi = 50
-num_points_theta = 52
+#Apparent Horizon finder
+AH_activate = 1
+AH_num_ranks = 20
+AH_num_points_u = 30
+AH_num_points_v = 50
+AH_solve_interval = 1
+AH_print_interval = 2
+#AH_doArea = false
+#AH_doSpin = false
+AH_updateCenter = false
+
+#AH_initial_guess = 0.5

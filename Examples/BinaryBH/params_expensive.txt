@@ -77,3 +77,15 @@ num_modes = 3
 modes = 2 0 # l m for spherical harmonics
         2 1
         2 2
+
+#Apparent Horizon finder
+AH_activate = 1
+AH_num_ranks = 20
+AH_num_points_u = 30
+AH_num_points_v = 50
+AH_solve_interval = 1
+AH_print_interval = 3
+#AH_updateCenter = false
+
+#AH_1_initial_guess = 0.25
+#AH_2_initial_guess = 0.25

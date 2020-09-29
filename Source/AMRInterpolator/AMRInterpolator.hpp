@@ -10,6 +10,7 @@
 
 #include "AMR.H"
 #include "AMRLevel.H"
+#include "LoHiSide.H"
 
 #include "UsingNamespace.H"
 
@@ -43,6 +44,10 @@ template <typename InterpAlgo> class AMRInterpolator
     void refresh();
     void limit_num_levels(unsigned int num_levels);
     void interp(InterpolationQuery &query);
+    const AMR &getAMR() const;
+    const std::array<double, CH_SPACEDIM> &get_coarsest_dx();
+    const std::array<double, CH_SPACEDIM> &get_coarsest_origin();
+    bool get_boundary_reflective(Side::LoHiSide a_side, int a_dir);
 
   private:
     void computeLevelLayouts();

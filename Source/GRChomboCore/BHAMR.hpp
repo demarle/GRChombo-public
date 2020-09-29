@@ -12,6 +12,15 @@
 #include <chrono>
 #include <ratio>
 
+// DISABLE_AHFINDER is used to override 'USE_AHFINDER' on specific examples
+// in which you don't want to use the AHFINDER
+// (add to GNUMakefile 'cxxcppflags := $(cxxcppflags) -DDISABLE_AHFINDER')
+#if defined(USE_AHFINDER) && !defined(DISABLE_AHFINDER)
+#include "AHInterpolation.hpp"
+#include "AHSphericalCoords.hpp"
+#include "ApparentHorizon.hpp"
+#endif
+
 /// A child of Chombo's AMR class to interface with tools which require
 /// access to the whole AMR hierarchy, and those of GRAMR
 /**
@@ -32,6 +41,21 @@ class BHAMR : public GRAMR
         m_puncture_coords.resize(m_num_punctures);
         m_puncture_shift.resize(m_num_punctures);
     }
+
+    ~BHAMR()
+    {
+#if defined(USE_AHFINDER) && !defined(DISABLE_AHFINDER)
+        // destroy horizon pointers and finalize PETSc
+        for (auto &ah : m_apparent_horizons)
+            delete ah;
+        AHFinder::finalize();
+#endif
+    }
+
+#if defined(USE_AHFINDER) && !defined(DISABLE_AHFINDER)
+    std::vector<ApparentHorizon<AHInterpolation<AHSphericalCoords>> *>
+        m_apparent_horizons;
+#endif
 
     // function to set punctures
     void set_puncture_data(

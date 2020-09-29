@@ -48,6 +48,14 @@ ALWAYS_INLINE data_t compute_determinant(const Tensor<2, data_t, 3> &matrix)
     return det;
 }
 
+/// Computes the determinant of a general 2x2 matrix
+template <class data_t>
+ALWAYS_INLINE data_t compute_determinant(const Tensor<2, data_t, 2> &matrix)
+{
+    data_t det = matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0];
+    return det;
+}
+
 /// Computes the inverse of a symmetric 3x3 matrix directly.
 template <class data_t>
 Tensor<2, data_t> compute_inverse_sym(const Tensor<2, data_t, 3> &matrix)

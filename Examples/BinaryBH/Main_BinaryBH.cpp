@@ -39,6 +39,18 @@ int runGRChombo(int argc, char *argv[])
         sim_params.verbosity);
     gr_amr.set_interpolator(&interpolator);
 
+#ifdef USE_AHFINDER
+    if (sim_params.AH_activate)
+    {
+        AHFinder::initialize(sim_params.AH_params.num_ranks, argc, argv);
+        AHFinder::add_ah(gr_amr, sim_params.bh1_params.center,
+                         sim_params.AH_1_initial_guess, sim_params.AH_params);
+        AHFinder::add_ah(gr_amr, sim_params.bh2_params.center,
+                         sim_params.AH_2_initial_guess, sim_params.AH_params);
+        AHFinder::add_ah_merger(gr_amr, 0, 1, sim_params.AH_params);
+    }
+#endif
+
     using Clock = std::chrono::steady_clock;
     using Minutes = std::chrono::duration<double, std::ratio<60, 1>>;
 

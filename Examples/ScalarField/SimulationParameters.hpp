@@ -42,6 +42,14 @@ class SimulationParameters : public SimulationParametersBase
         // Relaxation params
         pp.load("relaxtime", relaxtime);
         pp.load("relaxspeed", relaxspeed);
+
+#ifdef USE_AHFINDER
+        // for r~5, w~1, the total mass is approximately 4A^2, so radius at 0.5
+        // of that in usual coordinates
+        double AH_guess =
+            2. * initial_params.amplitudeSF * initial_params.amplitudeSF;
+        pp.load("AH_initial_guess", AH_initial_guess, AH_guess);
+#endif
     }
 
     // Problem specific parameters
@@ -53,6 +61,10 @@ class SimulationParameters : public SimulationParametersBase
     Potential::params_t potential_params;
     // Relaxation params
     Real relaxtime, relaxspeed;
+
+#ifdef USE_AHFINDER
+    double AH_initial_guess;
+#endif
 };
 
 #endif /* SIMULATIONPARAMETERS_HPP_ */

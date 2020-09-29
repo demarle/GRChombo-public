@@ -7,6 +7,7 @@
 #define SIMULATIONPARAMETERSBASE_HPP_
 
 // General includes
+#include "AHFinder.hpp"
 #include "BoundaryConditions.hpp"
 #include "CCZ4.hpp"
 #include "ChomboParameters.hpp"
@@ -117,6 +118,23 @@ class SimulationParametersBase : public ChomboParameters
         }
 
         pp.load("write_extraction", extraction_params.write_extraction, false);
+
+#ifdef USE_AHFINDER
+        // Apparent horizon parameters
+        pp.load("AH_activate", AH_activate, false);
+        if (AH_activate)
+        {
+            pp.load("AH_num_ranks", AH_params.num_ranks, 0); // 0 means "all"
+            pp.load("AH_num_points_u", AH_params.num_points_u);
+            pp.load("AH_num_points_v", AH_params.num_points_v);
+            pp.load("AH_solve_interval", AH_params.solve_interval, 1);
+            pp.load("AH_print_interval", AH_params.print_interval, 1);
+            pp.load("AH_max_failed_convergences",
+                    AH_params.max_failed_convergences, 1);
+            pp.load("AH_updateCenter", AH_params.updateCenter, true);
+            pp.load("AH_level", AH_params.level, 0);
+        }
+#endif
     }
 
     void check_radii()
@@ -173,6 +191,11 @@ class SimulationParametersBase : public ChomboParameters
     // Collection of parameters necessary for the CCZ4 RHS and extraction
     CCZ4::params_t ccz4_params;
     SphericalExtraction::params_t extraction_params;
+
+#ifdef USE_AHFINDER
+    bool AH_activate;
+    AHFinder::params AH_params;
+#endif
 };
 
 #endif /* SIMULATIONPARAMETERSBASE_HPP_ */

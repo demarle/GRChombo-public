@@ -124,3 +124,10 @@ void ScalarFieldLevel::computeTaggingCriterion(FArrayBox &tagging_criterion,
                                              m_p.regrid_threshold_phi),
                    current_state, tagging_criterion);
 }
+void ScalarFieldLevel::specificPostTimeStep()
+{
+#ifdef USE_AHFINDER
+    if (m_p.AH_activate && m_level == 0)
+        AHFinder::solve(m_bh_amr, m_dt, m_time, m_restart_time);
+#endif
+}
