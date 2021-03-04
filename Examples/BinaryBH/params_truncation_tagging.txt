@@ -1,0 +1,116 @@
+verbosity = 0
+chk_prefix = BinaryBH_
+plot_prefix = BinaryBHPlot_
+#restart_file = BinaryBH_000004.3d.hdf5
+
+# Set up grid spacings and regrid params
+# NB - the N values need to be multiples of block_factor
+
+N_full = 32
+L_full = 64
+
+#max_spatial_derivative_order = 5
+
+massA = 1
+offsetA = 5. 0. 0.
+
+massB = 1
+offsetB = -5. 0. 0.
+
+momentumA = 0. 0. 0.
+momentumB = 0. 0. 0.
+
+regrid_threshold = 0.1
+max_level = 4
+regrid_interval = 1 0 0 0 0 0 0 0 0
+
+use_truncation_error_tagging = true
+num_truncation_error_vars = 7
+truncation_error_vars = chi h11 h12 h13 h22 h23 h33
+truncation_error_regrid_threshold = 5.0e-3
+
+#Max and min box sizes
+max_box_size = 16
+min_box_size = 4
+tag_buffer_size = 3
+
+# boundaries and periodicity of grid
+# Periodic directions - 0 = false, 1 = true
+isPeriodic = 0 0 0
+# if not periodic, then specify the boundary type
+# 0 = static, 1 = sommerfeld, 2 = reflective
+# (see BoundaryConditions.hpp for details)
+hi_boundary = 1 1 1
+lo_boundary = 1 1 2
+
+# if reflective boundaries selected, must set
+# parity of all vars (in order given by UserVariables.hpp)
+# 0 = even
+# 1,2,3 = odd x, y, z
+# 4,5,6 = odd xy, yz, xz
+# 7     = odd xyz
+vars_parity            = 0 0 4 6 0 5 0    #chi and hij
+                         0 0 4 6 0 5 0    #K and Aij
+                         0 1 2 3          #Theta and Gamma
+                         0 1 2 3 1 2 3    #lapse shift and B
+vars_parity_diagnostic = 0 1 2 3          #Ham and Mom
+                         0 7              #Weyl
+                         0                #error
+
+# if sommerfeld boundaries selected, must select
+# asymptotic values
+num_nonzero_asymptotic_vars = 5
+nonzero_asymptotic_vars = chi h11 h22 h33 lapse
+nonzero_asymptotic_values = 1.0 1.0 1.0 1.0 1.0
+
+# Set up time steps
+# dt will be dx*dt_multiplier on each grid level
+# HDF5files are written every dt = L/N*dt_multiplier*checkpoint_interval
+
+checkpoint_interval = 0
+dt_multiplier = 0.25
+stop_time = 20
+speed_average_num_steps = 4
+#max_steps = 4
+
+calculate_constraint_norms = true
+
+plot_interval = 1
+num_plot_vars = 2
+plot_vars = chi error
+nan_check = 1
+
+#Lapse evolution
+lapse_advec_coeff = 1.0
+lapse_coeff = 2.0
+lapse_power = 1.0
+
+# Shift evolution
+shift_advec_coeff = 1.0
+shift_Gamma_coeff = 0.75
+eta = 0.5
+
+# CCZ4 parameters
+kappa1 = 0.1
+kappa2 = 0
+kappa3 = 1.
+covariantZ4 = 1 # 0: default. 1: dampk1 -> dampk1/lapse
+
+#coefficient for KO numerical dissipation
+sigma = 0.5
+
+#extraction params
+#default center to grid center, uncomment to change
+#extraction_center = 64 64 64
+activate_extraction = false
+num_extraction_radii = 2
+extraction_radii = 8. 10.
+extraction_levels = 1 0
+num_points_phi = 16
+num_points_theta = 24
+write_extraction = true
+num_modes = 4
+modes = 2 0
+        2 1
+        2 2
+        3 0

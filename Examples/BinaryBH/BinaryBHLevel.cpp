@@ -91,12 +91,6 @@ void BinaryBHLevel::specificUpdateODE(GRLevelData &a_soln,
     BoxLoops::loop(TraceARemoval(), a_soln, a_soln, INCLUDE_GHOST_CELLS);
 }
 
-void BinaryBHLevel::preTagCells()
-{
-    // We only use chi in the tagging criterion so only fill the ghosts for chi
-    fillAllGhosts(VariableType::evolution, Interval(c_chi, c_chi));
-}
-
 // specify the cells to tag
 void BinaryBHLevel::computeTaggingCriterion(FArrayBox &tagging_criterion,
                                             const FArrayBox &current_state)
@@ -214,5 +208,11 @@ void BinaryBHLevel::prePlotLevel()
                            Constraints(m_dx, c_Ham, Interval(c_Mom1, c_Mom3))),
                        m_state_new, m_state_diagnostics, EXCLUDE_GHOST_CELLS);
     }
+
+    preTagCells();
+
+    BoxLoops::loop(
+        TruncationErrorTagging(m_p.num_truncation_error_vars, m_level, c_error),
+        m_state_truncation_error, m_state_diagnostics, EXCLUDE_GHOST_CELLS);
 }
 #endif /* CH_USE_HDF5 */
