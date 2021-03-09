@@ -29,6 +29,16 @@ class SimulationParameters : public SimulationParametersBase
         pp.load("kerr_mass", kerr_params.mass);
         pp.load("kerr_spin", kerr_params.spin);
         pp.load("kerr_center", kerr_params.center, center);
+        pp.load("kerr_spin_direction", kerr_params.spin_direction,
+                {0., 0., 1.});
+
+#ifdef USE_AHFINDER
+        pp.load("AH_initial_guess", AH_initial_guess, 0.5 * kerr_params.mass);
+#ifdef USE_CHI_CONTOURS
+        pp.load("look_for_chi_contour", look_for_chi_contour);
+        CH_assert(look_for_chi_contour > 0.);
+#endif
+#endif
     }
 
     void check_params()
@@ -51,6 +61,15 @@ class SimulationParameters : public SimulationParametersBase
     }
 
     KerrBH::params_t kerr_params;
+
+#ifdef USE_AHFINDER
+    double AH_initial_guess;
+    // example of how to change the expansion function
+    double look_for_chi_contour; // look for a chi contour instead of the AH
+                                 // (negative number to look for AH)
+                                 // changes only the expansion function
+                                 // (ApparentHorizon::get_expansion)
+#endif
 };
 
 #endif /* SIMULATIONPARAMETERS_HPP_ */
