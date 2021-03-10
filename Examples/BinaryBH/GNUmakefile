@@ -43,3 +43,4 @@ ifeq ($(USE_TWOPUNCTURES),TRUE)
 endif
 
 include $(CHOMBO_HOME)/mk/Make.test
+include $(CHOMBO_HOME)/mk/Make.git
