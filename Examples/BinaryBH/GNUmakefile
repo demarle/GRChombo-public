@@ -43,6 +43,7 @@ endif
 
 # ParaView Catalyst insitu visualisation
 # Set PARAVIEW_DIR environment variable to use
+#XTRA_VTK_COMPONENT_FLAGS = -v IOParallelXML //example, for writer to debug
 include $(GRCHOMBO_SOURCE)/Insitu/Make.insitu
 
 include $(CHOMBO_HOME)/mk/Make.test

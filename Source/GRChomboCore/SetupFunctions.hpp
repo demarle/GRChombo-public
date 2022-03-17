@@ -53,8 +53,9 @@ void setupAMRObject(AMR &gr_amr, AMRLevelFactory &a_factory);
 void mainSetup(int argc, char *argv[])
 {
 #ifdef CH_MPI
-    // Start MPI
-    MPI_Init(&argc, &argv);
+   // Start MPI, threaded for OSPRay's module_mpi
+   int provided;
+   MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &provided);
 #ifdef CH_AIX
     H5dont_atexit();
 #endif

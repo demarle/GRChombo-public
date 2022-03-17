@@ -27,6 +27,7 @@
 #include <vtkCPPythonScriptPipeline.h>
 #include <vtkCellData.h>
 #include <vtkDoubleArray.h>
+#include <vtkIntArray.h>
 #include <vtkNew.h>
 #include <vtkOverlappingAMR.h>
 #include <vtkUniformGrid.h>
@@ -72,7 +73,9 @@ class CatalystAdaptor
     // send variables to catalyst
     void add_vars(vtkCPInputDataDescription *a_input_data_desc);
 
-    vtkDoubleArray *fab_to_vtk_array(FArrayBox &a_fab, int a_var,
+    vtkDoubleArray *fab_to_vtk_array(bool isLocal, vtkIdType numCells,
+                                     FArrayBox &a_fab,
+                                     int a_var,
                                      const std::string &a_name);
 
     // if a_success = false, either aborts or prints a warning depending on
