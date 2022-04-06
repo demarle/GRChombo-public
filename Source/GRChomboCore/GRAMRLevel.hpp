@@ -182,7 +182,9 @@ class GRAMRLevel : public AMRLevel, public InterpSource
     /// Calls Catalyst CoProcess
     void catalystCoProcess();
 
-    virtual void preCatalystCoProcess() {}
+    /// Things to do before calling Catalyst CoProcess (fills ghosts if not
+    /// overriden)
+    virtual void preCatalystCoProcess();
 #endif
 
   protected:
