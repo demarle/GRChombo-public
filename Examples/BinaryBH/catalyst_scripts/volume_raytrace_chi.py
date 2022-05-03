@@ -58,6 +58,7 @@ input.CellArrayStatus = ['chi']
 # show data from resampleToImage1
 display = Show(input, renderView1, 'AMRRepresentation')
 
+
 # get opacity transfer function/opacity map for 'chi'
 chiPWF = GetOpacityTransferFunction('chi')
 
@@ -65,8 +66,8 @@ chiPWF.Points = [0.0, 0.8, 0.5, 0.0,
                  0.05, 0.8, 0.5, 0.0,
                  0.15, 0.4, 0.5, 0.0,
                  0.4, 0.1, 0.5, 0.0,
-                 0.8, 0.001, 0.5, 0.0,
-                 0.9673850536346436, 0.0, 0.5, 0.0]
+                 0.6, 0.001, 0.5, 0.0,
+                 0.8, 0.0, 0.5, 0.0]
 """
 chiPWF.Points = [0.0, 0.0, 0.5, 0.0,
                  0.5, 0.3, 0.5, 0.0,
@@ -78,7 +79,10 @@ display.SetRepresentationType('Volume')
 display.ColorArrayName = ['CELLS', 'chi']
 display.ScalarOpacityUnitDistance = 1.0
 
-display.RescaleTransferFunctionToDataRange(True, True)
+#chiCTF = GetColorTransferFunction('chi')
+#chiCTF.AutomaticRescaleRangeMode = 'Clamp and update every timestep'
+
+display.RescaleTransferFunctionToDataRange(False, True)
 
 # ----------------------------------------------------------------
 # setup color maps and opacity mapes used in the visualization
@@ -96,6 +100,9 @@ pNG1 = CreateExtractor('PNG', renderView1, registrationName='PNG1')
 pNG1.Writer.FileName = 'OSPRayVolumeChi_{timestep:06d}{camera}.png'
 pNG1.Writer.ImageResolution = [1024, 768]
 pNG1.Writer.Format = 'PNG'
+pNG1.Writer.CameraMode = 'Phi-Theta'
+pNG1.Writer.PhiResolution = 1
+pNG1.Writer.ThetaResolution = 8
 
 import math
 import numpy
@@ -110,6 +117,7 @@ d = numpy.linalg.norm(pos-at)
 v1 = (pos-at)/d
 v2 = numpy.cross(v1,up)
 
+"""
 numsteps = 7
 for x in range(0,numsteps):
     print("T0 CAMERA VIEW ", x)
@@ -118,7 +126,7 @@ for x in range(0,numsteps):
     cam.SetPosition(pnow)
     # SaveScreenshot("foo_"+str(x)+".png") #not respecting viewsize for some reason
     WriteImage("foo_"+str(x)+".png")
-
+"""
 
 # ----------------------------------------------------------------
 # restore active source
