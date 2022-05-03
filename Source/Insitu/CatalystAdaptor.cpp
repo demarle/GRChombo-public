@@ -388,12 +388,15 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
                 }
 #endif
 
+		bool lb = local_box;
+		if (ilevel == 0) lb = false;
+
                 for (int ivar = 0; ivar < NUM_VARS; ++ivar)
                 {
                     if (requested_evolution_vars[ivar])
                     {
                         vtkDoubleArray *vtk_double_arr = fab_to_vtk_array(
-                            local_box,
+									  lb,
                             numCells,
                             evolution_fab,
                             ivar,
@@ -407,7 +410,7 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
                     if (requested_diagnostic_vars[ivar])
                     {
                         vtkDoubleArray *vtk_double_arr = fab_to_vtk_array(
-                            local_box,
+                            lb,
                             numCells,
                             diagnostic_fab,
                             ivar,
