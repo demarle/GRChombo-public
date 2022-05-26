@@ -13,7 +13,7 @@ plot_prefix = BinaryBHp_
 checkpoint_interval = 100
 # set to 0 to turn off plot files (except at t=0 and t=stop_time)
 # set to -1 to never ever print plotfiles
-plot_interval = 1
+plot_interval = 10
 num_plot_vars = 1
 plot_vars = chi
 
@@ -43,8 +43,8 @@ offsetB = 0.0 -6.10679 0.0
 # centerA = 256 232 256
 # centerB = 256 250 256
 
-momentumA = -0.0841746 -0.000510846 0.0
-momentumB =  0.0841746  0.000510846 0.0
+momentumA = -0.0841746 -0.00510846 0.0
+momentumB =  0.0841746  0.00510846 0.0
 
 #################################################
 # Grid parameters
@@ -119,7 +119,7 @@ nonzero_asymptotic_values = 1.0 1.0 1.0 1.0 1.0
 
 # dt will be dx*dt_multiplier on each grid level
 dt_multiplier = 0.25
-stop_time = 5.0
+stop_time = 50.0
 # max_steps = 100
 
 # Spatial derivative order (only affects CCZ4 RHS)
@@ -191,7 +191,8 @@ catalyst_verbosity = 2
 catalyst_scripts_path = catalyst_scripts
 num_catalyst_scripts = 1
 # list of Catalyst scripts
-catalyst_scripts = volume_raytrace_resample_chi.py
+#catalyst_scripts = volume_raytrace_resample_chi.py
+catalyst_scripts = volume_raytrace_chi.py
 catalyst_coprocess_level = 1
 num_catalyst_vars = 1
 catalyst_vars = chi

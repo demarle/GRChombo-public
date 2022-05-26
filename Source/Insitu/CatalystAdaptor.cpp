@@ -8,6 +8,8 @@
 
 #ifdef USE_CATALYST
 
+#include "vtkXMLPHierarchicalBoxDataWriter.h"
+
 CatalystAdaptor::CatalystAdaptor() {}
 
 CatalystAdaptor::CatalystAdaptor(
@@ -387,6 +389,16 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
             }
         }
     }
+#if 1
+    static int cnt = -1;
+    cnt = cnt + 1;
+    std::string fname = std::string("raw_catalyst_out") + std::to_string(cnt) + std::string(".vthb");
+    vtkXMLPHierarchicalBoxDataWriter *writer = vtkXMLPHierarchicalBoxDataWriter::New();
+    writer->SetInputData(m_vtk_grid_ptr);
+    writer->SetFileName(fname.c_str());
+    writer->Write();
+    writer->Delete();
+#endif
 }
 
 void CatalystAdaptor::coprocess(double a_time, unsigned int a_timestep)
