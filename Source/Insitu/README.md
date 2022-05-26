@@ -58,6 +58,7 @@ This in-situ adaptor has been tested with the following versions of ParaView:
 
 | Tested ParaView versions |
 | --- |
+| 5.8.1 |
 | 5.9.1 |
 | 5.10.0 |
 
@@ -174,34 +175,31 @@ in order to be able to use it.
 ## Using the in-situ visualization capabilities
 
 There are several Catalyst specific parameters which control the in-situ
-visualization processing which are described below:
- * `activate_catalyst = true/false`: This enables/disable Catalyst coprocessing
- at runtime. Note that if set to `false`, the other parameters are not read in.
- * `catalyst_verbosity = -2,...,10`: This controls the verbosity of information printed
- to `catalyst_pout` files and that printed to the normal `pout` files from
- the `CatalystAdaptor` class which interfaces with ParaView Catalyst.
- * `catalyst_pout_prefix`: This is the filename prefix for the `catalyst_pout`
- files. They are written to `pout_subpath` and appended by '`.<rank number>`' 
- as for the normal `pout` files. Note that you can set this to the same
- string as `pout_prefix` to send this output to the same
- * `catalyst_scripts_path`: This is the path that contains the Catalyst scripts
- generated as described [above](#generating-paraview-catalyst-scripts). Note
- that this path is relative to the current working directory and _not_ 
- `output_path`.
- * `num_catalyst_scripts`: Number of Catalyst scripts to process.
- * `catalyst_scripts`: Filenames of Catalyst scripts in the 
- `catalyst_scripts_path` directory.
- * `catalyst_coprocess_level`: This is the level for which the Catalyst
- coprocess routine is called at the end of each timestep.
- * `abort_on_catalyst_error = true/false`: If set to `true`, the code will abort
- if there is an error in Catalyst. The default is `false`.
- 
-Note that scripts generated with versions of ParaView v5.8 or earlier provide 
+visualization processing which are described in the table below.
+
+| Parameter Name             | Type             | Possible value [default] | Description |
+| ---                        | ---              | ---                      | ---         |
+| `catalyst_activate`        | `bool`           | `true`/[`false`] | Enables/disables Catalyst coprocessing at runtime. If set to `false`, other parameters are not set. |
+| `catalyst_verbosity`       | `int`            | `-2`,...,[`verbosity`],..,`10` | Controls verbosity in `catalyst_pout` files and that printed to the normal `pout` files from the `CatalystAdaptor` class which interfaces with ParaView Catalyst |
+| `catalyst_pout_prefix`     | `string`         | [`"catalyst_pout"`] | Filename prefix for the `catalyst_pout` files. They are written to `pout_subpath` and appended by `. <rank_number>` as for the normal `pout` files. Note that this can be set to the same string as `pout_prefix` to send the output to the normal `pout` files. |
+| `catalyst_scripts_path`    | `string`         | `""` | Path that contains the Catalyst Python scrips generated as described [above](#generating-paraview-catalyst-scripts). Note that this path should be either an absolute path or relative to the current directory and _not_ `output_path`. |
+| `catalyst_num_scripts`     | `int`            | [`1`] | Number of Catalyst Python scripts |
+| `catalyst_scripts`         | `vector<string>` | - | Filenames of Catalyst Python scripts in the `catalyst_scripts_path` directory. |
+| `catalyst_coprocess_level` | `int`            | [`0`],...,`max_level` | Level for which the Catalyst coprocess routine is called at the end of each timestep |
+| `catalyst_remove_ghosts`   | `bool`           | `true`/[`false`] | If `true`, Chombo data will be deep-copied to new VTK arrays without ghosts rather than simply passing the pointers. This is for debugging and should not be necessary for most users. |
+| `catalyst_abort_on_error`  | `bool`           | `true`/[`false`] | If `true`, the code will abort if there is an error in Catalyst. |
+| `catalyst_num_vars`*        | `int`            | [`0`],...,`NUM_VARS + NUM_DIAGNOSTIC_VARS` | Number of variables in `catalyst_vars` |
+| `catalyst_vars`*            | `vector<string>` | - | Restrict variables passed to Catalyst to only these ones. No restriction if `catalyst_num_vars == 0`.|
+| `catalyst_write_vtk_files`  | `bool`           | `true`/[`false`] | Controls whether VTK XML files containing the full 3D AMR data passed to Catalyst are written or not. These files can be opened in ParaView |
+| `vtk_file_prefix`           | `string`         | [`"Catalyst_VTK_"`] | Filename prefix for VTK XML files. The filenames will be of the form `<vtk_file_prefix>_<6 digit timestep on catalyst_coprocess_level>`. Note there will be multiple files for each timestep: one of type `.vth` and a subdirectory containing `.vti` files for each box. |
+
+*Note that scripts generated with versions of ParaView v5.8 or earlier provide 
 information to the pipeline about the specific variables they require. Since 
 this feature is not currently provided by ParaView v5.9 or later, scripts
 generated with these versions request all variables by default. In order to
 only pass specific variables to Catalyst, it is possible to restrict the 
-variables passed using the `num_catalyst_vars` and `catalyst_vars` parameters.
+variables passed using the `num_catalyst_vars` and `catalyst_vars` parameters
+(as described above). 
 If these are not set, and a script generated by ParaView v5.9 or later is used,
 all variables will be passed to Catalyst.
 

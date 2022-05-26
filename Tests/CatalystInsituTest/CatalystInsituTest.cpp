@@ -19,6 +19,7 @@
 // General includes:
 #include <algorithm>
 #include <cmath>
+#include <unistd.h>
 
 #include "GRAMR.hpp"
 
@@ -37,16 +38,6 @@
 #include <vtkImageDifference.h>
 #include <vtkNew.h>
 #include <vtkPNGReader.h>
-// ParaView version checking doesn't seem to be very stable between versions
-#ifdef __has_include
-#if __has_include(<vtkPVVersion.h>)
-#include <vtkPVVersion.h>
-#define PARAVIEW_VERSION_KNOWN
-#elif __has_include(<vtkPVConfig.h>)
-#include <vtkPVConfig.h>
-#define PARAVIEW_VERSION_KNOWN
-#endif
-#endif
 #endif
 
 // Chombo namespace
@@ -56,13 +47,6 @@
 int runInsituTest(int argc, char *argv[])
 {
     int status = 0;
-#ifdef PARAVIEW_VERSION_KNOWN
-    // We use a Catalyst v2.0 script that only works with ParaView 5.9 or higher
-    if (10000 * PARAVIEW_VERSION_MAJOR + 100 * PARAVIEW_VERSION_MINOR +
-            PARAVIEW_VERSION_PATCH <
-        50900)
-        return -2;
-#endif
 
     // Load the parameter file and construct the SimulationParameter class
     // To add more parameters edit the SimulationParameters file.
@@ -71,6 +55,12 @@ int runInsituTest(int argc, char *argv[])
     char const *in_file = argv[argc - 1];
     GRParmParse pp(0, argv + argc, NULL, in_file);
     SimulationParameters sim_params(pp);
+
+    // Get the modified time of the generated PNG now to check it's changed by
+    // Catalyst
+    struct stat generated_png_file_stat_before;
+    stat(sim_params.generated_png_file.c_str(),
+         &generated_png_file_stat_before);
 
     GRAMR gr_amr;
     DefaultLevelFactory<InsituTestLevel> insitu_test_level_factory(gr_amr,
@@ -88,6 +78,13 @@ int runInsituTest(int argc, char *argv[])
     call_task.execute(gr_amr);
     gr_amr.run(sim_params.stop_time, sim_params.max_steps);
     gr_amr.conclude();
+
+    // Check that the generated PNG was modified after time_before
+    struct stat generated_png_file_stat_after;
+    stat(sim_params.generated_png_file.c_str(), &generated_png_file_stat_after);
+    if (generated_png_file_stat_before.st_mtim.tv_nsec >=
+        generated_png_file_stat_after.st_mtim.tv_nsec)
+        return 2;
 
     // read the newly generated PNG and the expected PNG
     vtkNew<vtkPNGReader> generated_png_reader;
@@ -132,6 +129,11 @@ int main(int argc, char *argv[])
     else if (status == -2)
     {
         pout() << "Catalyst Insitu test skipped (ParaView version < 5.9)."
+               << std::endl;
+    }
+    else if (status == 2)
+    {
+        pout() << "Catalyst Insitu test failed (extracted PNG not modified)."
                << std::endl;
     }
     else

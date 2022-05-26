@@ -5,6 +5,7 @@
 
 #include "CatalystAdaptor.hpp"
 #include "GRAMRLevel.hpp"
+#include "ParaviewVersion.hpp"
 
 #ifdef USE_CATALYST
 
@@ -12,14 +13,9 @@
 
 CatalystAdaptor::CatalystAdaptor() {}
 
-CatalystAdaptor::CatalystAdaptor(
-    GRAMR *a_gr_amr_ptr, const std::vector<std::string> &a_python_scripts,
-    const std::string &a_output_path,
-    const std::vector<std::pair<int, VariableType>> &a_vars,
-    bool a_abort_on_catalyst_error, int a_verbosity)
+CatalystAdaptor::CatalystAdaptor(GRAMR *a_gr_amr_ptr, const params_t &a_params)
 {
-    initialise(a_gr_amr_ptr, a_python_scripts, a_output_path, a_vars,
-               a_abort_on_catalyst_error, a_verbosity);
+    initialise(a_gr_amr_ptr, a_params);
 }
 
 CatalystAdaptor::~CatalystAdaptor()
@@ -30,11 +26,7 @@ CatalystAdaptor::~CatalystAdaptor()
     }
 }
 
-void CatalystAdaptor::initialise(
-    GRAMR *a_gr_amr_ptr, const std::vector<std::string> &a_python_scripts,
-    const std::string &a_output_path,
-    const std::vector<std::pair<int, VariableType>> &a_vars,
-    bool a_abort_on_catalyst_error, int a_verbosity)
+void CatalystAdaptor::initialise(GRAMR *a_gr_amr_ptr, const params_t &a_params)
 {
     // don't initalise twice
     if (m_initialised)
@@ -49,22 +41,23 @@ void CatalystAdaptor::initialise(
         return;
     }
     m_gr_amr_ptr = a_gr_amr_ptr;
-    m_vars = a_vars;
-    m_abort_on_catalyst_error = a_abort_on_catalyst_error;
+    m_p = a_params;
+    m_requested_evolution_vars.fill(false);
+    m_requested_diagnostic_vars.fill(false);
 
     // Initialise VTK CP Processor
     if (!m_proc_ptr)
     {
         m_proc_ptr = vtkCPProcessor::New();
         int m_proc_ptr_initialization_success;
-        if (a_output_path.empty())
+        if (m_p.output_path.empty())
         {
             m_proc_ptr_initialization_success = m_proc_ptr->Initialize();
         }
         else
         {
             m_proc_ptr_initialization_success =
-                m_proc_ptr->Initialize(a_output_path.c_str());
+                m_proc_ptr->Initialize(m_p.output_path.c_str());
         }
         std::string error_msg = "Failed to initialize vtkCPProcessor in "
                                 "CatalystAdaptor::initialise";
@@ -76,29 +69,27 @@ void CatalystAdaptor::initialise(
     }
 
     // Create Python script pipeline and add it to the VTK CP Processor
-    for (const std::string &script : a_python_scripts)
+    for (const std::string &script : m_p.python_scripts)
     {
-        if (auto pipeline =
-                vtkCPPythonScriptPipeline::CreateAndInitializePipeline(
-                    script.c_str()))
-        {
-            int add_pipeline_success = m_proc_ptr->AddPipeline(pipeline);
-            std::string add_pipeline_fail_msg =
-                "Failed to add pipeline for script: ";
-            add_pipeline_fail_msg += script;
-            catalyst_error_or_warning(add_pipeline_success,
-                                      add_pipeline_fail_msg);
-        }
-        else
-        {
-            std::string pipeline_fail_msg =
-                "Failed to set up pipeline for script: ";
-            pipeline_fail_msg += script;
-            catalyst_error_or_warning(false, pipeline_fail_msg);
-        }
+#if PARAVIEW_VERSION_HERE >= PARAVIEW_VERSION_TEST(5, 9, 0)
+        auto pipeline =
+            vtkCPPythonPipeline::CreateAndInitializePipeline(script.c_str());
+        bool pipeline_init_success = (pipeline != nullptr);
+#else
+        vtkNew<vtkCPPythonScriptPipeline> pipeline;
+        int pipeline_init_success = pipeline->Initialize(script.c_str());
+#endif
+        std::string pipeline_init_fail_msg =
+            "Failed to initialize pipelone for script: ";
+        pipeline_init_fail_msg += script;
+        catalyst_error_or_warning(pipeline_init_success,
+                                  pipeline_init_fail_msg);
+        int add_pipeline_success = m_proc_ptr->AddPipeline(pipeline);
+        std::string add_pipeline_fail_msg =
+            "Failed to add pipeline for script: ";
+        add_pipeline_fail_msg += script;
+        catalyst_error_or_warning(add_pipeline_success, add_pipeline_fail_msg);
     }
-
-    m_verbosity = a_verbosity;
 
     m_initialised = true;
 }
@@ -120,7 +111,7 @@ void CatalystAdaptor::finalise()
 
 void CatalystAdaptor::build_vtk_grid()
 {
-    if (m_verbosity)
+    if (m_p.verbosity)
     {
         pout() << "CatalystAdaptor::build_vtk_grid" << std::endl;
     }
@@ -150,7 +141,7 @@ void CatalystAdaptor::build_vtk_grid()
         gramrlevels[0]->getLevelData().ghostVect();
     const double coarsest_dx = gramrlevels[0]->get_dx();
     RealVect ghosted_origin_global_vect = coarsest_ghost_vect;
-    ghosted_origin_global_vect *= -coarsest_dx;
+    ghosted_origin_global_vect *= (!m_p.remove_ghosts) ? -coarsest_dx : 0;
     m_vtk_grid_ptr->SetOrigin(ghosted_origin_global_vect.dataPtr());
 
     // now add all the boxes
@@ -172,12 +163,23 @@ void CatalystAdaptor::build_vtk_grid()
         {
             // first get the box without ghosts
             Box box = level_box_layout[lit];
+            // VTK counts the big end differently to Chombo so modify the Chombo
+            // box so VTK gets what it needs
+            for (int idir = 0; idir < SpaceDim; ++idir)
+            {
+                box.growHi(idir, 1);
+            }
             const IntVect &small_end = box.smallEnd();
             const IntVect &big_end = box.bigEnd();
 
-            // now grow the box to make the ghosted box
+            // now grow the box to make the ghosted box (no change if
+            // m_remove_ghosts == true)
             Box ghosted_box = box;
-            ghosted_box.grow(level_data.ghostVect());
+
+            // ghost_vect takes into account m_remove_ghosts
+            const IntVect &ghost_vect =
+                (m_p.remove_ghosts) ? IntVect::Zero : level_data.ghostVect();
+            ghosted_box.grow(ghost_vect);
             const IntVect &small_ghosted_end = ghosted_box.smallEnd();
             const IntVect &big_ghosted_end = ghosted_box.bigEnd();
 
@@ -200,23 +202,21 @@ void CatalystAdaptor::build_vtk_grid()
             {
                 vtkNew<vtkUniformGrid> vtk_uniform_grid_ptr;
 
-                vtk_uniform_grid_ptr->SetOrigin(origin_global);
-                vtk_uniform_grid_ptr->SetSpacing(dx_arr);
-                vtk_uniform_grid_ptr->SetExtent(
-                    small_ghosted_end[0], big_ghosted_end[0] + 1,
-                    small_ghosted_end[1], big_ghosted_end[1] + 1,
-                    small_ghosted_end[2], big_ghosted_end[2] + 1);
-                // add the ghost cell information
-                // int no_ghost[6] = {small_end[0], big_end[0] + 1,
-                //    small_end[1], big_end[1] + 1,
-                //    small_end[2], big_end[2] + 1};
+                // vtk_uniform_grid_ptr->SetOrigin(origin_global);
+                // vtk_uniform_grid_ptr->SetSpacing(dx_arr);
+                // vtk_uniform_grid_ptr->SetExtent(
+                //     small_ghosted_end[0], big_ghosted_end[0],
+                //     small_ghosted_end[1], big_ghosted_end[1],
+                //     small_ghosted_end[2], big_ghosted_end[2]);
+                // // add the ghost cell information
+                // int no_ghost[6] = {small_end[0], big_end[0],   small_end[1],
+                //                    big_end[1],   small_end[2], big_end[2]};
                 // bool cell_data = true;
                 // vtk_uniform_grid_ptr->GenerateGhostArray(no_ghost,
                 // cell_data);
 
-                // vtk_uniform_grid_ptr->Initialize(
-                // &vtk_amr_box, origin_global, dx_arr,
-                // level_data.ghostVect().dataPtr());
+                vtk_uniform_grid_ptr->Initialize(&vtk_amr_box, origin, dx_arr,
+                                                 ghost_vect.dataPtr());
 
                 m_vtk_grid_ptr->SetDataSet(ilevel, ibox, vtk_uniform_grid_ptr);
             }
@@ -239,51 +239,44 @@ void CatalystAdaptor::build_vtk_grid()
 
 void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
 {
-    if (m_verbosity)
+    if (m_p.verbosity)
     {
-        pout() << "CatalystAdaptor::add_vars" << std::endl;
-    }
-
-    std::array<bool, NUM_VARS> requested_evolution_vars;
-    std::array<bool, NUM_DIAGNOSTIC_VARS> requested_diagnostic_vars;
-
-    if (m_verbosity)
-    {
-        pout() << "CatalystAdaptor Requested variables: ";
+        pout() << "CatalystAdaptor::add_vars" << std::endl
+               << "CatalystAdaptor Requested variables: ";
     }
 
     for (int ivar = 0; ivar < NUM_VARS; ++ivar)
     {
-        requested_evolution_vars[ivar] = a_input_data_desc->IsFieldNeeded(
+        m_requested_evolution_vars[ivar] = a_input_data_desc->IsFieldNeeded(
             UserVariables::variable_names[ivar].c_str(), vtkDataObject::CELL);
-        if (m_vars.size() > 0)
+        if (m_p.vars.size() > 0)
         {
             bool pass_var =
-                !(std::find(m_vars.begin(), m_vars.end(),
+                !(std::find(m_p.vars.begin(), m_p.vars.end(),
                             std::make_pair(ivar, VariableType::evolution)) ==
-                  m_vars.end());
-            requested_evolution_vars[ivar] &= pass_var;
+                  m_p.vars.end());
+            m_requested_evolution_vars[ivar] &= pass_var;
         }
-        if (m_verbosity && requested_evolution_vars[ivar])
+        if (m_p.verbosity && m_requested_evolution_vars[ivar])
             pout() << UserVariables::variable_names[ivar] << " ";
     }
     for (int ivar = 0; ivar < NUM_DIAGNOSTIC_VARS; ++ivar)
     {
-        requested_diagnostic_vars[ivar] = a_input_data_desc->IsFieldNeeded(
+        m_requested_diagnostic_vars[ivar] = a_input_data_desc->IsFieldNeeded(
             DiagnosticVariables::variable_names[ivar].c_str(),
             vtkDataObject::CELL);
-        if (m_vars.size() > 0)
+        if (m_p.vars.size() > 0)
         {
             bool pass_var =
-                !(std::find(m_vars.begin(), m_vars.end(),
+                !(std::find(m_p.vars.begin(), m_p.vars.end(),
                             std::make_pair(ivar, VariableType::diagnostic)) ==
-                  m_vars.end());
-            requested_diagnostic_vars[ivar] &= pass_var;
+                  m_p.vars.end());
+            m_requested_diagnostic_vars[ivar] &= pass_var;
         }
-        if (m_verbosity && requested_diagnostic_vars[ivar])
+        if (m_p.verbosity && m_requested_diagnostic_vars[ivar])
             pout() << DiagnosticVariables::variable_names[ivar] << " ";
     }
-    if (m_verbosity)
+    if (m_p.verbosity)
         pout() << std::endl;
 
     vtkAMRInformation *amr_info = m_vtk_grid_ptr->GetAMRInfo();
@@ -321,6 +314,7 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
                 FArrayBox &diagnostic_fab = (NUM_DIAGNOSTIC_VARS > 0)
                                                 ? diagnostic_level_data[dind]
                                                 : evolution_level_data[dind];
+                const Box &unghosted_box = level_box_layout[dind];
 
 #if DEBUG
                 vtkAMRBox vtk_box = m_vtk_grid_ptr->GetAMRBox(ilevel, ibox);
@@ -366,22 +360,42 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
 
                 for (int ivar = 0; ivar < NUM_VARS; ++ivar)
                 {
-                    if (requested_evolution_vars[ivar])
+                    if (m_requested_evolution_vars[ivar])
                     {
-                        vtkDoubleArray *vtk_double_arr = fab_to_vtk_array(
-                            evolution_fab, ivar,
-                            UserVariables::variable_names[ivar]);
+                        vtkDoubleArray *vtk_double_arr;
+                        if (!m_p.remove_ghosts)
+                        {
+                            vtk_double_arr = fab_to_vtk_array(
+                                evolution_fab, ivar,
+                                UserVariables::variable_names[ivar]);
+                        }
+                        else
+                        {
+                            vtk_double_arr = fab_to_vtk_array_without_ghosts(
+                                evolution_fab, unghosted_box, ivar,
+                                UserVariables::variable_names[ivar]);
+                        }
                         vtk_uniform_grid_ptr->GetCellData()->AddArray(
                             vtk_double_arr);
                     }
                 }
                 for (int ivar = 0; ivar < NUM_DIAGNOSTIC_VARS; ++ivar)
                 {
-                    if (requested_diagnostic_vars[ivar])
+                    if (m_requested_diagnostic_vars[ivar])
                     {
-                        vtkDoubleArray *vtk_double_arr = fab_to_vtk_array(
-                            diagnostic_fab, ivar,
-                            DiagnosticVariables::variable_names[ivar]);
+                        vtkDoubleArray *vtk_double_arr;
+                        if (!m_p.remove_ghosts)
+                        {
+                            vtk_double_arr = fab_to_vtk_array(
+                                diagnostic_fab, ivar,
+                                DiagnosticVariables::variable_names[ivar]);
+                        }
+                        else
+                        {
+                            vtk_double_arr = fab_to_vtk_array_without_ghosts(
+                                diagnostic_fab, unghosted_box, ivar,
+                                DiagnosticVariables::variable_names[ivar]);
+                        }
                         vtk_uniform_grid_ptr->GetCellData()->AddArray(
                             vtk_double_arr);
                     }
@@ -401,6 +415,23 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
 #endif
 }
 
+void CatalystAdaptor::write_vtk_grid(unsigned int a_timestep)
+{
+    vtkNew<vtkXMLPUniformGridAMRWriter> file_writer;
+
+    // make filename
+    char timestep_cstr[7];
+    std::sprintf(timestep_cstr, "%06d.", a_timestep);
+    std::string filename = m_p.vtk_file_prefix;
+    filename += timestep_cstr;
+    filename += file_writer->GetDefaultFileExtension();
+
+    // set data and write
+    file_writer->SetInputData(m_vtk_grid_ptr);
+    file_writer->SetFileName(filename.c_str());
+    file_writer->Write();
+}
+
 void CatalystAdaptor::coprocess(double a_time, unsigned int a_timestep)
 {
     pout() << "CatalystAdaptor::coprocess at time " << a_time << " and step "
@@ -416,6 +447,11 @@ void CatalystAdaptor::coprocess(double a_time, unsigned int a_timestep)
         auto input_data_description =
             data_description->GetInputDescriptionByName("input");
         add_vars(input_data_description);
+
+        if (m_p.write_vtk_files)
+        {
+            write_vtk_grid(a_timestep);
+        }
         // vtkNew<vtkOverlappingAMR> stripped_vtk_grid;
         // vtkAMRUtilities::StripGhostLayers(m_vtk_grid_ptr, stripped_vtk_grid);
         input_data_description->SetGrid(m_vtk_grid_ptr);
@@ -425,17 +461,57 @@ void CatalystAdaptor::coprocess(double a_time, unsigned int a_timestep)
     }
 }
 
+const std::array<bool, NUM_VARS> &
+CatalystAdaptor::get_requested_evolution_vars()
+{
+    return m_requested_evolution_vars;
+}
+
+const std::array<bool, NUM_DIAGNOSTIC_VARS> &
+CatalystAdaptor::get_requested_diagnostic_vars()
+{
+    return m_requested_diagnostic_vars;
+}
+
 vtkDoubleArray *CatalystAdaptor::fab_to_vtk_array(FArrayBox &a_fab, int a_var,
                                                   const std::string &a_name)
 {
     vtkDoubleArray *out = vtkDoubleArray::New();
     vtkIdType num_cells = a_fab.size().product();
-    out->SetNumberOfTuples(num_cells);
     out->SetName(a_name.c_str());
     // this prevents Catalyst from deallocating the Chombo
     // data pointers
     int save_data = 1;
     out->SetArray(a_fab.dataPtr(a_var), num_cells, save_data);
+    return out;
+}
+
+vtkDoubleArray *CatalystAdaptor::fab_to_vtk_array_without_ghosts(
+    FArrayBox &a_fab, const Box &a_unghosted_box, int a_var,
+    const std::string &a_name)
+{
+    vtkDoubleArray *out = vtkDoubleArray::New();
+    vtkIdType num_cells = a_unghosted_box.volume();
+    // the following allocates memory in the VTK Array
+    out->SetNumberOfTuples(num_cells);
+    out->SetName(a_name.c_str());
+
+    const IntVect &small_end = a_unghosted_box.smallEnd();
+    const IntVect &big_end = a_unghosted_box.bigEnd();
+
+    vtkIdType vtk_idx = 0;
+    for (int iz = small_end[2]; iz <= big_end[2]; ++iz)
+    {
+        for (int iy = small_end[1]; iy <= big_end[1]; ++iy)
+        {
+            for (int ix = small_end[0]; ix <= big_end[0]; ++ix)
+            {
+                out->SetValue(vtk_idx, a_fab(IntVect(ix, iy, iz), a_var));
+                ++vtk_idx;
+            }
+        }
+    }
+
     return out;
 }
 
@@ -445,7 +521,7 @@ void CatalystAdaptor::catalyst_error_or_warning(bool a_success,
     if (a_success)
         return;
 
-    if (m_abort_on_catalyst_error)
+    if (m_p.abort_on_error)
         MayDay::Error(a_msg.c_str());
     else
         MayDay::Warning(a_msg.c_str());

@@ -32,6 +32,8 @@ using std::endl;
 
 #ifdef USE_CATALYST
 #include "vtkLogger.h"
+#include "vtkSMPTools.h"
+#include "vtkVersion.h"
 #endif
 
 #ifdef _OPENMP
@@ -93,6 +95,32 @@ void mainSetup(int argc, char *argv[])
         cerr << " usage " << argv[0] << " <input_file_name> " << endl;
         exit(0);
     }
+
+#ifdef USE_CATALYST
+    // Use the VTK_SMP_MAX_THREADS environment variable to set the maximum
+    // number of SMP threads if it exists
+    if (!std::getenv("VTK_SMP_MAX_THREADS"))
+    {
+        // otherwise set it to the same as the number of OpenMP threads
+#ifdef _OPENMP
+        int num_threads = omp_get_max_threads();
+#else
+        int num_threads = 1;
+#endif
+        vtkSMPTools::Initialize(num_threads);
+    }
+    else
+    {
+        // VTK will automatically check the VTK_SMP_MAX_THREADS environment
+        // variable
+        vtkSMPTools::Initialize();
+    }
+    if (rank == 0)
+    {
+        std::cout << " catalyst threads = "
+                  << vtkSMPTools::GetEstimatedNumberOfThreads() << std::endl;
+    }
+#endif
 }
 
 void mainFinalize()
@@ -188,8 +216,10 @@ void setupAMRObject(GRAMR &gr_amr, AMRLevelFactory &a_factory)
 #endif
     }
 #ifdef USE_CATALYST
+#if VTK_VERSION_NUMBER >= VTK_VERSION_CHECK(9, 0, 20201030)
     // set vtkLogger internal messages to only appear at verbosity 2
     vtkLogger::SetInternalVerbosityLevel(vtkLogger::VERBOSITY_3);
+#endif
 #ifdef CH_MPI
     vtkLogger::SetStderrVerbosity(vtkLogger::VERBOSITY_ERROR);
     std::string catalyst_log_file = chombo_params.pout_path +
@@ -204,18 +234,15 @@ void setupAMRObject(GRAMR &gr_amr, AMRLevelFactory &a_factory)
     }
     vtkLogger::LogToFile(
         catalyst_log_file.c_str(), vtk_logger_file_mode,
-        vtkLogger::ConvertToVerbosity(chombo_params.catalyst_verbosity));
+        vtkLogger::ConvertToVerbosity(chombo_params.catalyst_params.verbosity));
     // Only write VTK stderr messages if there is an error
 #else
     vtkLogger::SetStderrVerbosity(
         static_cast<vtkLogger::Verbosity>(chombo_params.verbosity));
 #endif
     vtkLogger::Init();
-    gr_amr.setup_catalyst(
-        chombo_params.activate_catalyst, chombo_params.catalyst_scripts,
-        chombo_params.output_path, chombo_params.catalyst_vars,
-        chombo_params.abort_on_catalyst_error,
-        chombo_params.catalyst_verbosity);
+    gr_amr.setup_catalyst(chombo_params.catalyst_activate,
+                          chombo_params.catalyst_params);
 #endif
 }
 

@@ -12,10 +12,11 @@
 #include <string>
 
 // Chombo includes
+#include "Box.H"
+#include "FArrayBox.H"
 #include "MayDay.H"
 
 // GRChombo includes
-#include "GRAMR.hpp"
 #include "UserVariables.hpp"
 
 // ParaView/VTK/Catalyst includes
@@ -30,6 +31,7 @@
 #include <vtkNew.h>
 #include <vtkOverlappingAMR.h>
 #include <vtkUniformGrid.h>
+#include <vtkXMLPUniformGridAMRWriter.h>
 
 // Chombo namespace
 #include "UsingNamespace.H"
@@ -41,29 +43,44 @@ class GRAMR;
 class CatalystAdaptor
 {
   public:
+    struct params_t
+    {
+        int verbosity;
+        bool abort_on_error = false;
+        bool remove_ghosts = false;
+
+        // Pipeline parameters
+        std::vector<std::string> python_scripts;
+        std::string output_path;
+
+        // VTK file writing parameters
+        bool write_vtk_files = false;
+        std::string vtk_file_prefix = "Catalyst_VTK_grid_";
+
+        // variables to pass to Catalyst set by GRChombo parameter
+        std::vector<std::pair<int, VariableType>> vars;
+    };
+
     // empty constructor (doesn't call initialise)
     CatalystAdaptor();
 
     // full constructor (calls initialise)
-    CatalystAdaptor(GRAMR *a_gr_amr_ptr,
-                    const std::vector<std::string> &a_python_scripts,
-                    const std::string &a_output_path,
-                    const std::vector<std::pair<int, VariableType>> &a_vars,
-                    bool a_abort_on_catalyst_error, int a_verbosity);
+    CatalystAdaptor(GRAMR *a_gr_amr_ptr, const params_t &a_params);
 
     // destructor
     ~CatalystAdaptor();
 
     // Initialisation/Finalisation
-    void initialise(GRAMR *m_gr_amr_ptr,
-                    const std::vector<std::string> &a_python_scripts,
-                    const std::string &a_output_path,
-                    const std::vector<std::pair<int, VariableType>> &a_vars,
-                    bool a_abort_on_catalyst_error, int a_verbosity);
+    void initialise(GRAMR *m_gr_amr_ptr, const params_t &a_params);
     void finalise();
 
     // do Catalyst processing
     void coprocess(double a_time, unsigned int a_timestep);
+
+    // returns the variables that were last requested/sent to Catalyst
+    const std::array<bool, NUM_VARS> &get_requested_evolution_vars();
+    const std::array<bool, NUM_DIAGNOSTIC_VARS> &
+    get_requested_diagnostic_vars();
 
   private:
     // update the AMR grid (no grid data)
@@ -72,19 +89,31 @@ class CatalystAdaptor
     // send variables to catalyst
     void add_vars(vtkCPInputDataDescription *a_input_data_desc);
 
+    // write VTK grid to a file
+    void write_vtk_grid(unsigned int a_timestep);
+
+    // directly passes the FAB pointer to the VTK array
     vtkDoubleArray *fab_to_vtk_array(FArrayBox &a_fab, int a_var,
                                      const std::string &a_name);
+
+    // copies the data in the FAB to the VTK array without the ghosts
+    vtkDoubleArray *fab_to_vtk_array_without_ghosts(FArrayBox &a_fab,
+                                                    const Box &a_unghosted_box,
+                                                    int a_var,
+                                                    const std::string &a_name);
 
     // if a_success = false, either aborts or prints a warning depending on
     // m_abort_on_catalyst_error
     void catalyst_error_or_warning(bool a_success, std::string a_msg);
 
-    int m_verbosity;
-    bool m_initialised = false;
-    bool m_abort_on_catalyst_error = false;
     GRAMR *m_gr_amr_ptr = nullptr;
-    // variables to pass to Catalyst
-    std::vector<std::pair<int, VariableType>> m_vars;
+    bool m_initialised = false;
+
+    params_t m_p;
+
+    // variables actually passed to Catalyst on last CoProcess
+    std::array<bool, NUM_VARS> m_requested_evolution_vars;
+    std::array<bool, NUM_DIAGNOSTIC_VARS> m_requested_diagnostic_vars;
 
     vtkCPProcessor *m_proc_ptr = nullptr;
     vtkOverlappingAMR *m_vtk_grid_ptr = nullptr;
