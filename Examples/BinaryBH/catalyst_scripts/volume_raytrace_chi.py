@@ -25,7 +25,7 @@ renderView1.CenterOfRotation = [N_full/2.0, N_full/2.0, N_full/2.0]
 renderView1.CameraFocalPoint = [N_full/2.0, N_full/2.0, N_full/2.0]
 renderView1.CameraPosition = [N_full/2.0, N_full*1.8, N_full*5.0]
 renderView1.CameraViewUp = [1.0, 0.0, 0.0]
-renderView1.EnableRayTracing = 0
+renderView1.EnableRayTracing = 1
 renderView1.BackEnd = 'OSPRay raycaster'
 renderView1.SamplesPerPixel = 1
 renderView1.Background = [0.0, 0.0, 0.0]
@@ -80,15 +80,29 @@ chiPWF.Points = [0.0, 0.8, 0.5, 0.0,
                  0.4, 0.1, 0.5, 0.0,
                  0.6, 0.001, 0.5, 0.0,
                  0.8, 0.0, 0.5, 0.0]
+"""
+"""
 chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
                  0.4, 0.1, 0.5, 0.0,
                  0.5, 0.0, 0.5, 0.0,
                  1.0, 0.0, 0.5, 0.0]
 """
-chiPWF.Points = [0.0, 0.3, 0.0, 0.0,
-                 0.8, 0.0, 0.0, 0.0,
-                 1.0, 0.0, 0.0, 0.0]
+chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
+                 0.1, 0.0, 0.5, 0.0,
+                 0.2, 0.1, 0.5, 0.0,
+                 0.3, 0.0, 0.5, 0.0,
+                 0.4, 0.01, 0.5, 0.0,
+                 0.3, 0.0, 0.5, 0.0,
+                 0.5, 0.01, 0.5, 0.0,
+                 0.6, 0.0, 0.5, 0.0,
+                 0.7, 0.01, 0.5, 0.0,
+                 0.8, 0.0, 0.5, 0.0]
 
+"""
+chiPWF.Points = [0.0, 0.3, 0.0, 0.0,
+                 0.99, 0.0, 0.0, 0.0,
+                 1.0, 0.0, 0.0, 0.0]
+"""
 # trace defaults for the display properties.
 display.SetRepresentationType('Volume')
 display.ColorArrayName = ['CELLS', 'chi']
@@ -116,8 +130,8 @@ pNG1.Writer.FileName = 'OSPRayVolumeChi_{timestep:06d}{camera}.png'
 pNG1.Writer.ImageResolution = [1024, 768]
 pNG1.Writer.Format = 'PNG'
 pNG1.Writer.CameraMode = 'Phi-Theta'
-pNG1.Writer.PhiResolution = 1
-pNG1.Writer.ThetaResolution = 1
+pNG1.Writer.PhiResolution = 4
+pNG1.Writer.ThetaResolution = 4
 
 # ----------------------------------------------------------------
 # restore active source
