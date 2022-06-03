@@ -9,6 +9,8 @@
 
 #ifdef USE_CATALYST
 
+#include "vtkIntArray.h"
+
 CatalystAdaptor::CatalystAdaptor() {}
 
 CatalystAdaptor::CatalystAdaptor(GRAMR *a_gr_amr_ptr, const params_t &a_params)
@@ -69,14 +71,9 @@ void CatalystAdaptor::initialise(GRAMR *a_gr_amr_ptr, const params_t &a_params)
     // Create Python script pipeline and add it to the VTK CP Processor
     for (const std::string &script : m_p.python_scripts)
     {
-#if PARAVIEW_VERSION_HERE >= PARAVIEW_VERSION_TEST(5, 9, 0)
         auto pipeline =
             vtkCPPythonPipeline::CreateAndInitializePipeline(script.c_str());
         bool pipeline_init_success = (pipeline != nullptr);
-#else
-        vtkNew<vtkCPPythonScriptPipeline> pipeline;
-        int pipeline_init_success = pipeline->Initialize(script.c_str());
-#endif
         std::string pipeline_init_fail_msg =
             "Failed to initialize pipelone for script: ";
         pipeline_init_fail_msg += script;
@@ -138,6 +135,15 @@ void CatalystAdaptor::build_vtk_grid()
     const IntVect &coarsest_ghost_vect =
         gramrlevels[0]->getLevelData().ghostVect();
     const double coarsest_dx = gramrlevels[0]->get_dx();
+
+    //tell VTKOSP how many ghost levels
+    vtkIntArray *ia = vtkIntArray::New();
+    ia->SetName("ghost_vect");
+    ia->SetNumberOfComponents(3);
+    ia->InsertNextTuple3(coarsest_ghost_vect[0], coarsest_ghost_vect[1], coarsest_ghost_vect[2]);
+    m_vtk_grid_ptr->GetFieldData()->AddArray(ia);
+    ia->Delete();    
+
     RealVect ghosted_origin_global_vect = coarsest_ghost_vect;
     ghosted_origin_global_vect *= (!m_p.remove_ghosts) ? -coarsest_dx : 0;
     m_vtk_grid_ptr->SetOrigin(ghosted_origin_global_vect.dataPtr());
@@ -200,21 +206,23 @@ void CatalystAdaptor::build_vtk_grid()
             {
                 vtkNew<vtkUniformGrid> vtk_uniform_grid_ptr;
 
-                // vtk_uniform_grid_ptr->SetOrigin(origin_global);
-                // vtk_uniform_grid_ptr->SetSpacing(dx_arr);
-                // vtk_uniform_grid_ptr->SetExtent(
-                //     small_ghosted_end[0], big_ghosted_end[0],
-                //     small_ghosted_end[1], big_ghosted_end[1],
-                //     small_ghosted_end[2], big_ghosted_end[2]);
-                // // add the ghost cell information
-                // int no_ghost[6] = {small_end[0], big_end[0],   small_end[1],
-                //                    big_end[1],   small_end[2], big_end[2]};
-                // bool cell_data = true;
-                // vtk_uniform_grid_ptr->GenerateGhostArray(no_ghost,
-                // cell_data);
-
-                vtk_uniform_grid_ptr->Initialize(&vtk_amr_box, origin, dx_arr,
+#if 1
+                vtk_uniform_grid_ptr->SetOrigin(origin_global);
+                vtk_uniform_grid_ptr->SetSpacing(dx_arr);
+                vtk_uniform_grid_ptr->SetExtent(
+                     small_ghosted_end[0], big_ghosted_end[0],
+                     small_ghosted_end[1], big_ghosted_end[1],
+                     small_ghosted_end[2], big_ghosted_end[2]);
+                // add the ghost cell information
+                int no_ghost[6] = {small_end[0], big_end[0],   small_end[1],
+                                   big_end[1],   small_end[2], big_end[2]};
+                bool cell_data = true;
+                vtk_uniform_grid_ptr->GenerateGhostArray(no_ghost,
+                  cell_data);
+#else 
+               vtk_uniform_grid_ptr->Initialize(&vtk_amr_box, origin, dx_arr,
                                                  ghost_vect.dataPtr());
+#endif
 
                 m_vtk_grid_ptr->SetDataSet(ilevel, ibox, vtk_uniform_grid_ptr);
             }
@@ -408,7 +416,7 @@ void CatalystAdaptor::write_vtk_grid(unsigned int a_timestep)
     vtkNew<vtkXMLPUniformGridAMRWriter> file_writer;
 
     // make filename
-    char timestep_cstr[7];
+    char timestep_cstr[8];
     std::sprintf(timestep_cstr, "%06d.", a_timestep);
     std::string filename = m_p.vtk_file_prefix;
     filename += timestep_cstr;
