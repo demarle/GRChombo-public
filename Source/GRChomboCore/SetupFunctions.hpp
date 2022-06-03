@@ -56,7 +56,13 @@ void mainSetup(int argc, char *argv[])
 {
 #ifdef CH_MPI
     // Start MPI
-    MPI_Init(&argc, &argv);
+    int isMPIThreadingAvail;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &isMPIThreadingAvail);
+    if (!isMPIThreadingAvail)
+    {
+        std::cerr << "NEED THREADS FOR OSP MPI CATALYST" << std::endl;
+        abort();
+    }
 #ifdef CH_AIX
     H5dont_atexit();
 #endif
