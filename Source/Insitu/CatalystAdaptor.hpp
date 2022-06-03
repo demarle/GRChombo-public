@@ -93,7 +93,8 @@ class CatalystAdaptor
     void write_vtk_grid(unsigned int a_timestep);
 
     // directly passes the FAB pointer to the VTK array
-    vtkDoubleArray *fab_to_vtk_array(FArrayBox &a_fab, int a_var,
+    vtkDoubleArray *fab_to_vtk_array(bool is_local, vtkIdType numCells,
+                                     FArrayBox &a_fab, int a_var,
                                      const std::string &a_name);
 
     // copies the data in the FAB to the VTK array without the ghosts

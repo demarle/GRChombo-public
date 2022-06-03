@@ -10,6 +10,7 @@
 #ifdef USE_CATALYST
 
 #include "vtkXMLPHierarchicalBoxDataWriter.h"
+#include "vtkIntArray.h"
 
 CatalystAdaptor::CatalystAdaptor() {}
 
@@ -71,7 +72,8 @@ void CatalystAdaptor::initialise(GRAMR *a_gr_amr_ptr, const params_t &a_params)
     // Create Python script pipeline and add it to the VTK CP Processor
     for (const std::string &script : m_p.python_scripts)
     {
-#if PARAVIEW_VERSION_HERE >= PARAVIEW_VERSION_TEST(5, 9, 0)
+//DDM #if PARAVIEW_VERSION_HERE >= PARAVIEW_VERSION_TEST(5, 9, 0)
+#if 1
         auto pipeline =
             vtkCPPythonPipeline::CreateAndInitializePipeline(script.c_str());
         bool pipeline_init_success = (pipeline != nullptr);
@@ -136,10 +138,21 @@ void CatalystAdaptor::build_vtk_grid()
     m_vtk_grid_ptr->Initialize(num_levels, boxes_per_level);
 
     // The origin is always at (0, 0, 0) in Chombo
-    double origin_global[3] = {0., 0., 0.};
+    double origin_global[3] = {0., 0., 0.};    
     const IntVect &coarsest_ghost_vect =
-        gramrlevels[0]->getLevelData().ghostVect();
+        gramrlevels[0]->getLevelData().ghostVect();    
     const double coarsest_dx = gramrlevels[0]->get_dx();
+
+    //tell VTKOSP how many ghost levels
+    vtkIntArray *ia = vtkIntArray::New();
+    ia->SetName("ghost_vect");
+    ia->SetNumberOfComponents(3);
+    ia->InsertNextTuple3(coarsest_ghost_vect[0], coarsest_ghost_vect[1], coarsest_ghost_vect[2]);
+    std::cerr << "GV " << coarsest_ghost_vect[0] << "," << coarsest_ghost_vect[1] << "," << coarsest_ghost_vect[2] << std::endl;
+
+    m_vtk_grid_ptr->GetFieldData()->AddArray(ia);
+    ia->Delete();    
+
     RealVect ghosted_origin_global_vect = coarsest_ghost_vect;
     ghosted_origin_global_vect *= (!m_p.remove_ghosts) ? -coarsest_dx : 0;
     m_vtk_grid_ptr->SetOrigin(ghosted_origin_global_vect.dataPtr());
@@ -155,6 +168,7 @@ void CatalystAdaptor::build_vtk_grid()
         m_vtk_grid_ptr->SetSpacing(ilevel, dx_arr);
         m_vtk_grid_ptr->SetRefinementRatio(ilevel, level->refRatio());
         const GRLevelData &level_data = level->getLevelData();
+        std::cerr << "L " << ilevel << " " << level_data.ghostVect() << std::endl;
         const DisjointBoxLayout &level_box_layout =
             level_data.disjointBoxLayout();
         LayoutIterator lit = level_box_layout.layoutIterator();
@@ -198,25 +212,27 @@ void CatalystAdaptor::build_vtk_grid()
 
             bool local_box = (procID() == level_box_layout.procID(lit()));
             // only need to do the following for local boxes
-            if (local_box)
+            if (local_box)// || ilevel == 0)
             {
                 vtkNew<vtkUniformGrid> vtk_uniform_grid_ptr;
 
-                // vtk_uniform_grid_ptr->SetOrigin(origin_global);
-                // vtk_uniform_grid_ptr->SetSpacing(dx_arr);
-                // vtk_uniform_grid_ptr->SetExtent(
-                //     small_ghosted_end[0], big_ghosted_end[0],
-                //     small_ghosted_end[1], big_ghosted_end[1],
-                //     small_ghosted_end[2], big_ghosted_end[2]);
-                // // add the ghost cell information
-                // int no_ghost[6] = {small_end[0], big_end[0],   small_end[1],
-                //                    big_end[1],   small_end[2], big_end[2]};
-                // bool cell_data = true;
-                // vtk_uniform_grid_ptr->GenerateGhostArray(no_ghost,
-                // cell_data);
-
-                vtk_uniform_grid_ptr->Initialize(&vtk_amr_box, origin, dx_arr,
+#if 1
+                vtk_uniform_grid_ptr->SetOrigin(origin_global);
+                vtk_uniform_grid_ptr->SetSpacing(dx_arr);
+                vtk_uniform_grid_ptr->SetExtent(
+                     small_ghosted_end[0], big_ghosted_end[0],
+                     small_ghosted_end[1], big_ghosted_end[1],
+                     small_ghosted_end[2], big_ghosted_end[2]);
+                // add the ghost cell information
+                int no_ghost[6] = {small_end[0], big_end[0],   small_end[1],
+                                   big_end[1],   small_end[2], big_end[2]};
+                bool cell_data = true;
+                vtk_uniform_grid_ptr->GenerateGhostArray(no_ghost,
+                  cell_data);
+#else 
+               vtk_uniform_grid_ptr->Initialize(&vtk_amr_box, origin, dx_arr,
                                                  ghost_vect.dataPtr());
+#endif
 
                 m_vtk_grid_ptr->SetDataSet(ilevel, ibox, vtk_uniform_grid_ptr);
             }
@@ -224,7 +240,7 @@ void CatalystAdaptor::build_vtk_grid()
     }
 
     m_vtk_grid_ptr->Audit();
-#if DEBUG
+#if 1
     const double *vtk_grid_bounds = m_vtk_grid_ptr->GetAMRInfo()->GetBounds();
     pout() << "VTK Grid Bounds:"
            << "(" << vtk_grid_bounds[0] << "," << vtk_grid_bounds[2] << ","
@@ -298,22 +314,34 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
         const DisjointBoxLayout &level_box_layout =
             evolution_level_data.disjointBoxLayout();
         LayoutIterator lit = level_box_layout.layoutIterator();
+        LayoutIterator lit2 = level_box_layout.layoutIterator();
+	lit2.begin();
+	while (procID() != level_box_layout.procID(lit2())) {
+	  ++lit2;
+	}
+	DataIndex dummybegin(lit2());
         int ibox;
         for (ibox = 0, lit.begin(); lit.ok(); ++lit, ++ibox)
         {
             // only add data that we have locally
             bool local_box = (procID() == level_box_layout.procID(lit()));
-            if (local_box)
+            if (local_box)// || ilevel == 0)
             {
                 vtkUniformGrid *vtk_uniform_grid_ptr =
                     m_vtk_grid_ptr->GetDataSet(ilevel, ibox);
 
                 // hopefully this promotion works
                 DataIndex dind(lit());
-                FArrayBox &evolution_fab = evolution_level_data[dind];
-                FArrayBox &diagnostic_fab = (NUM_DIAGNOSTIC_VARS > 0)
-                                                ? diagnostic_level_data[dind]
-                                                : evolution_level_data[dind];
+                FArrayBox &evolution_fab = local_box
+		  ? evolution_level_data[dind]
+		  : evolution_level_data[dummybegin];
+                FArrayBox &diagnostic_fab = local_box
+		  ? ((NUM_DIAGNOSTIC_VARS > 0)
+		     ? diagnostic_level_data[dind]
+		     : evolution_level_data[dind])
+		  : evolution_level_data[dummybegin];
+                int numCells = vtk_uniform_grid_ptr->GetNumberOfCells();
+		
                 const Box &unghosted_box = level_box_layout[dind];
 
 #if DEBUG
@@ -366,13 +394,14 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
                         if (!m_p.remove_ghosts)
                         {
                             vtk_double_arr = fab_to_vtk_array(
+                                local_box, numCells,
                                 evolution_fab, ivar,
                                 UserVariables::variable_names[ivar]);
                         }
                         else
                         {
                             vtk_double_arr = fab_to_vtk_array_without_ghosts(
-                                evolution_fab, unghosted_box, ivar,
+				evolution_fab, unghosted_box, ivar,
                                 UserVariables::variable_names[ivar]);
                         }
                         vtk_uniform_grid_ptr->GetCellData()->AddArray(
@@ -387,13 +416,14 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
                         if (!m_p.remove_ghosts)
                         {
                             vtk_double_arr = fab_to_vtk_array(
-                                diagnostic_fab, ivar,
+                                local_box, numCells,
+				diagnostic_fab, ivar,
                                 DiagnosticVariables::variable_names[ivar]);
                         }
                         else
                         {
                             vtk_double_arr = fab_to_vtk_array_without_ghosts(
-                                diagnostic_fab, unghosted_box, ivar,
+				diagnostic_fab, unghosted_box, ivar,
                                 DiagnosticVariables::variable_names[ivar]);
                         }
                         vtk_uniform_grid_ptr->GetCellData()->AddArray(
@@ -420,11 +450,12 @@ void CatalystAdaptor::write_vtk_grid(unsigned int a_timestep)
     vtkNew<vtkXMLPUniformGridAMRWriter> file_writer;
 
     // make filename
-    char timestep_cstr[7];
+    char timestep_cstr[8];
     std::sprintf(timestep_cstr, "%06d.", a_timestep);
     std::string filename = m_p.vtk_file_prefix;
     filename += timestep_cstr;
     filename += file_writer->GetDefaultFileExtension();
+    std::cerr << filename << std::endl;
 
     // set data and write
     file_writer->SetInputData(m_vtk_grid_ptr);
@@ -473,16 +504,25 @@ CatalystAdaptor::get_requested_diagnostic_vars()
     return m_requested_diagnostic_vars;
 }
 
-vtkDoubleArray *CatalystAdaptor::fab_to_vtk_array(FArrayBox &a_fab, int a_var,
+vtkDoubleArray *CatalystAdaptor::fab_to_vtk_array(bool local_box, vtkIdType num_cells,
+ 					          FArrayBox &a_fab, int a_var,
                                                   const std::string &a_name)
 {
     vtkDoubleArray *out = vtkDoubleArray::New();
-    vtkIdType num_cells = a_fab.size().product();
+    //    vtkIdType num_cells = a_fab.size().product();
+    out->SetNumberOfTuples(num_cells);
     out->SetName(a_name.c_str());
     // this prevents Catalyst from deallocating the Chombo
     // data pointers
-    int save_data = 1;
-    out->SetArray(a_fab.dataPtr(a_var), num_cells, save_data);
+    if (local_box) {
+       int save_data = 1;
+       out->SetArray(a_fab.dataPtr(a_var), num_cells, save_data);
+    } else {
+      std::cerr << "NAN BLOCK" << std::endl;
+      for (int i = 0; i < num_cells; i++) {
+	out->SetValue(i, NAN);
+      }
+    }
     return out;
 }
 
