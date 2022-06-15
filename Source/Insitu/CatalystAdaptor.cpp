@@ -433,7 +433,7 @@ void CatalystAdaptor::add_vars(vtkCPInputDataDescription *a_input_data_desc)
             }
         }
     }
-#if 1
+#if 0
     static int cnt = -1;
     cnt = cnt + 1;
     std::string fname = std::string("raw_catalyst_out") + std::to_string(cnt) + std::string(".vthb");
