@@ -88,7 +88,9 @@ chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
                  1.0, 0.0, 0.5, 0.0]
 """
 chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
-                 0.1, 0.0, 0.5, 0.0,
+                 0.03, 0.0, 0.5, 0.0,
+                 0.1, 0.5, 0.5, 0.0,
+                 0.15, 0.0, 0.5, 0.0,
                  0.2, 0.1, 0.5, 0.0,
                  0.3, 0.0, 0.5, 0.0,
                  0.4, 0.01, 0.5, 0.0,
@@ -130,7 +132,7 @@ pNG1.Writer.FileName = 'OSPRayVolumeChi_{timestep:06d}{camera}.png'
 pNG1.Writer.ImageResolution = [1024, 768]
 pNG1.Writer.Format = 'PNG'
 pNG1.Writer.CameraMode = 'Phi-Theta'
-pNG1.Writer.PhiResolution = 4
+pNG1.Writer.PhiResolution = 1
 pNG1.Writer.ThetaResolution = 4
 
 # ----------------------------------------------------------------
