@@ -17,14 +17,6 @@ renderView1 = CreateView('RenderView')
 renderView1.UseColorPaletteForBackground = 0
 renderView1.ViewSize = [1024, 768]
 renderView1.AxesGrid = 'GridAxes3DActor'
-#renderView1.CenterOfRotation = [32.0, 32.0, 32.0]
-#renderView1.CameraPosition = [32.0, 60.0, 96.0]
-#renderView1.CameraFocalPoint = [32.0, 32.0, 32.0]
-N_full = 64
-renderView1.CenterOfRotation = [N_full/2.0, N_full/2.0, N_full/2.0]
-renderView1.CameraFocalPoint = [N_full/2.0, N_full/2.0, N_full/2.0]
-renderView1.CameraPosition = [N_full/2.0, N_full*1.8, N_full*5.0]
-renderView1.CameraViewUp = [1.0, 0.0, 0.0]
 renderView1.EnableRayTracing = 1
 renderView1.BackEnd = 'OSPRay raycaster'
 renderView1.SamplesPerPixel = 1
@@ -119,6 +111,8 @@ display.RescaleTransferFunctionToDataRange(False, True)
 # setup color maps and opacity mapes used in the visualization
 # note: the Get..() functions create a new object, if needed
 # ----------------------------------------------------------------
+
+renderView1.ResetCamera()
 
 # ----------------------------------------------------------------
 # setup extractors
