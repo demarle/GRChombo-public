@@ -66,39 +66,34 @@ input.CellArrayStatus = ['Weyl4_Re']
 #resampleToImage1Display = Show(resampleToImage1, renderView1, 'UniformGridRepresentation')
 resampleToImage1Display = Show(input, renderView1, 'AMRRepresentation')
 
+# trace defaults for the display properties.
+resampleToImage1Display.SetRepresentationType('Volume')
+resampleToImage1Display.ColorArrayName = ['POINTS', 'Weyl4_Re']
+resampleToImage1Display.ScalarOpacityUnitDistance = 1.0
+
 # get color transfer function/color map for 'Weyl4_Re'
 weyl4_ReLUT = GetColorTransferFunction('Weyl4_Re')
-lutmodes = ["Never",
-            "Grow and update on 'Apply'",
-            "Grow and update every timestep",
-            "Update on 'Apply'",
-            "Clamp and update every timestep"]
+weyl4_ReLUT.ScalarRangeInitialized = 1
+weyl4_ReLUT.AutomaticRescaleRangeMode = "Never"
+
 weyl4_ReLUT.RGBPoints = [-1.00, 1.0, 0.0, 0.0,
                          -0.01, 1.0, 0.0, 0.0,
                           0.00, 0.1, 0.0, 0.1,
                           0.01, 0.0, 0.0, 1.0,
-                          1.00, 0.0, 0.0, 1.0,]
+                          1.00, 0.0, 0.0, 1.0]
 weyl4_ReLUT.ColorSpace = 'RGB'
-weyl4_ReLUT.ScalarRangeInitialized = 1.0
 
 # get opacity transfer function/opacity map for 'Weyl4_Re'
 weyl4_RePWF = GetOpacityTransferFunction('Weyl4_Re')
-weyl4_RePWF.Points = [-1.0000, 0.4, 0.0, 0.0,
+weyl4_RePWF.Points = [-1.0000, 0.0, 0.0, 0.0,
+                      -0.9999, 0.4, 0.0, 0.0,
                       -0.0101, 0.4, 0.0, 0.0,
                       -0.0100, 0.0, 0.0, 0.0,
                        0.0100, 0.0, 0.0, 0.0,
                        0.0101, 0.4, 0.0, 0.0,
-                       1.0000, 0.4, 0.0, 0.0]
-weyl4_RePWF.ScalarRangeInitialized = 1
-weyl4_ReLUT.AutomaticRescaleRangeMode = lutmodes[0]
-weyl4_ReLUT.Build()
+                       0.9999, 0.4, 0.0, 0.0,
+                       1.0000, 0.0, 0.0, 0.0]
 
-# trace defaults for the display properties.
-resampleToImage1Display.SetRepresentationType('Volume')
-resampleToImage1Display.ColorArrayName = ['POINTS', 'Weyl4_Re']
-resampleToImage1Display.LookupTable = weyl4_ReLUT
-resampleToImage1Display.ScalarOpacityUnitDistance = 1.0
-resampleToImage1Display.ScalarOpacityFunction = weyl4_RePWF
 
 # ----------------------------------------------------------------
 # setup color maps and opacity mapes used in the visualization

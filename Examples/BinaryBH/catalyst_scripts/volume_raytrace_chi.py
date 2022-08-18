@@ -8,6 +8,20 @@ paraview.simple._DisableFirstRenderCameraReset()
 
 print("into coprocess")
 
+
+def rescaleTF(pts, newRange):
+  vals = pts[::4] # get values, ignore R,G,B
+  npts = len(vals)
+  mV = min(vals)
+  MV = max(vals)
+  rV = MV-mV
+  mnR = newRange[0]
+  MnR = newRange[1]
+  rnR = newRange[1]-newRange[0]
+  for x in range(0, npts):
+      pts[x*4+0] = (pts[x*4+0]-mV)/rV*rnR+mnR
+  return pts
+
 # ----------------------------------------------------------------
 # setup views used in the visualization
 # ----------------------------------------------------------------
@@ -49,9 +63,6 @@ input.CellArrayStatus = ['chi']
 
 pythonCalculator1 = PythonCalculator(registrationName='PythonCalculator1', Input=input)
 pythonCalculator1.ArrayAssociation = 'Cell Data'
-#pythonCalculator1.Expression = "(chi-min(chi))/(max(chi)-min(chi))"
-#pythonCalculator1.Expression = "min(chi)"
-#pythonCalculator1.Expression = "(chi-numpy.nanmin(chi))/(numpy.nanmax(chi)-numpy.nanmin(chi))"
 pythonCalculator1.Expression = "chi"
 
 # ----------------------------------------------------------------
@@ -61,51 +72,36 @@ pythonCalculator1.Expression = "chi"
 # show data from resampleToImage1
 display = Show(input, renderView1, 'AMRRepresentation')
 
-
-# get opacity transfer function/opacity map for 'chi'
-chiPWF = GetOpacityTransferFunction('chi')
-
-"""
-chiPWF.Points = [0.0, 0.8, 0.5, 0.0,
-                 0.05, 0.8, 0.5, 0.0,
-                 0.15, 0.4, 0.5, 0.0,
-                 0.4, 0.1, 0.5, 0.0,
-                 0.6, 0.001, 0.5, 0.0,
-                 0.8, 0.0, 0.5, 0.0]
-"""
-"""
-chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
-                 0.4, 0.1, 0.5, 0.0,
-                 0.5, 0.0, 0.5, 0.0,
-                 1.0, 0.0, 0.5, 0.0]
-"""
-chiPWF.Points = [0.0, 1.0, 0.5, 0.0,
-                 0.03, 0.0, 0.5, 0.0,
-                 0.1, 0.5, 0.5, 0.0,
-                 0.15, 0.0, 0.5, 0.0,
-                 0.2, 0.1, 0.5, 0.0,
-                 0.3, 0.0, 0.5, 0.0,
-                 0.4, 0.01, 0.5, 0.0,
-                 0.3, 0.0, 0.5, 0.0,
-                 0.5, 0.01, 0.5, 0.0,
-                 0.6, 0.0, 0.5, 0.0,
-                 0.7, 0.01, 0.5, 0.0,
-                 0.8, 0.0, 0.5, 0.0]
-
-"""
-chiPWF.Points = [0.0, 0.3, 0.0, 0.0,
-                 0.99, 0.0, 0.0, 0.0,
-                 1.0, 0.0, 0.0, 0.0]
-"""
 # trace defaults for the display properties.
 display.SetRepresentationType('Volume')
 display.ColorArrayName = ['CELLS', 'chi']
 display.ScalarOpacityUnitDistance = 1.0
 
-#chiCTF = GetColorTransferFunction('chi')
-#chiCTF.AutomaticRescaleRangeMode = 'Clamp and update every timestep'
+chiCTF = GetColorTransferFunction('chi')
+chiCTF.ScalarRangeInitialized = 1
+chiCTF.AutomaticRescaleRangeMode = "Never"
+pts = chiCTF.RGBPoints
+pts = rescaleTF(pts, [0,1])
+chiCTF.RGBPoints = pts;
 
-display.RescaleTransferFunctionToDataRange(False, True)
+chiPWF = GetOpacityTransferFunction('chi')
+pts = [0.0, 1.0, 0.5, 0.0,
+       0.03, 0.0, 0.5, 0.0,
+       0.1, 0.5, 0.5, 0.0,
+       0.15, 0.0, 0.5, 0.0,
+       0.2, 0.1, 0.5, 0.0,
+       0.3, 0.0, 0.5, 0.0,
+       0.4, 0.01, 0.5, 0.0,
+       0.3, 0.0, 0.5, 0.0,
+       0.5, 0.01, 0.5, 0.0,
+       0.6, 0.0, 0.5, 0.0,
+       0.7, 0.01, 0.5, 0.0,
+       0.8, 0.0, 0.5, 0.0]
+pts = rescaleTF(pts, [0,0.8])
+chiPWF.Points = pts
+
+
+#display.RescaleTransferFunctionToDataRange(False, True) #
 
 # ----------------------------------------------------------------
 # setup color maps and opacity mapes used in the visualization
